@@ -54,7 +54,7 @@ if __name__ == "__main__":
     group.add_argument("--windows", help="Windows Operating System", action="store_true")
     group.add_argument("--linux", help="Linux Operating System", action="store_true")
     group.add_argument("--mac", help="Mac Operating System", action="store_true")    
-    
+    group.add_argument("--manual", help="Type In Your Driver Path Manually", action="store_true")
     args = vars(parser.parse_args())
 
     if not args["read_all_emails"]: read_emails = False
@@ -72,8 +72,10 @@ if __name__ == "__main__":
                 print("\nNot A Valid Path\n")
                 continue
 
+    global driver_path
     driver_path = ""
     def driverSetup(arch):
+	global driver_path
 #	print(os.getcwd()+"/Drivers/chromedriver%s"%arch)
         if os.path.exists(os.getcwd()+"/Drivers/chromedriver%s"%arch):
 	    #print("Driver Found")
@@ -96,7 +98,8 @@ if __name__ == "__main__":
 	if not driverSetup("_linux64"): manualdriverSetup()
     elif args["mac"]:
 	if not driverSetup("_mac64"): manualdriverSetup()
-
+    elif args["manual"]:
+	manualdriverSetup()
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--mute-audio")
@@ -105,7 +108,7 @@ if __name__ == "__main__":
 
     chrome_options.binary_location = bin_path
 
-    driver = webdriver.Chrome("Drivers/chromedriver_mac64", chrome_options=chrome_options)
+    driver = webdriver.Chrome("Drivers/chromedriver_linux64", chrome_options=chrome_options)
     loading = True
     def loading():
         animates = "/-\|"
