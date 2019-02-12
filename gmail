@@ -83,6 +83,7 @@ if __name__ == "__main__":
 	    return True
     	else: return False    
     def manualdriverSetup():
+	global driver_path
         while True:
             driver_path = raw_input("Driver Path: ")
             if os.path.exists(driver_path):
@@ -108,7 +109,7 @@ if __name__ == "__main__":
 
     chrome_options.binary_location = bin_path
 
-    driver = webdriver.Chrome("Drivers/chromedriver_linux64", chrome_options=chrome_options)
+    driver = webdriver.Chrome(driver_path, chrome_options=chrome_options)
     loading = True
     def loading():
         animates = "/-\|"
