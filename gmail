@@ -1,79 +1,148 @@
-import thread
-import threading
-import socket
+#!/usr/local/bin/python
+
+import time, os, sys
+import argparse, threading
 from selenium import webdriver
-import sys,os,time
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
-os.system("clear||cls")
-browser_opts = webdriver.ChromeOptions()
-def addopt(opt): browser_opts.add_argument(str(opt))
-#print(sys.argv[0])
-addopt("--incognito"); addopt("--mute-audio");
-if os.path.exists("/Applications/Chromium.app/Contents/MacOS/Chromium"):
-    browser_opts.binary_location = "/Applications/Chromium.app/Contents/MacOS/Chromium"
-elif os.path.exists("/usr/bin/chromium"):
-    browser_opts.binary_location = "/usr/bin/chromium"
-else:
-    while True:
-        bin_path = raw_input("Please Enter Chrome/Chromium Executable Path: ")
-        if os.path.exists(bin_path):
-            browser_opts.binary_location = bin_path
-            break
-        else:
-            print("\nNot A Valid Path\n")
-            continue
+def cursoroff():
+    if 'posix' in os.name:
+	sys.stdout.write("\x1b[?25l")
+def cursoron():
+    if 'posix' in os.name:
+	sys.stdout.write("\x1b[?25h")
+cursoroff()
+def gotoLogin(__driver):
+    try:
+        __driver.get("https://google.com/gmail/"); time.sleep(1.5);
+        #print(__driver.page_source)
+        email_login_js = 'document.getElementById("Email").value = "%s";' \
+                            %str(args["email"]); email_login_js += 'document.getElementById("next").click();';
+        __driver.execute_script(email_login_js); time.sleep(1.5)
+        #print(__driver.page_source)
+        #print("Set Email")
+        password_login_js = 'document.getElementById("Passwd").value = "%s";' \
+                            %str(args["password"]); password_login_js += 'document.getElementById("signIn").click();'
+        __driver.execute_script(password_login_js); time.sleep(1.5)
+        return True
+    except Exception as error:
+        #print(error);
+        return False
 
-if os.path.exists(os.getcwd()+"/Drivers/chromedriver"):
-    driver_path = str(os.getcwd()+"/Drivers/chromedriver")
-elif os.path.exists(sys.argv[0]+"/../Drivers/chromedriver"):
-    driver_path = str(sys.argv[0]+"/../Drivers/chromedriver")
-else:
-    while True:
-        driver_path = raw_input("Driver Path: ")
-        if os.path.exists(driver_path):
-            driver_path = driver_path
-            break
-        else:
-            print("\nNot Valid Path\n")
-            continue
+def getUnreadEmails(__driver):
+    try:
+        unread_emailsn = __driver.execute_script("return document.getElementsByClassName('yP').length;")
+        unread_email_titles = []
+        for i in range(unread_emailsn):
+            unread_email_titles.append(__driver.execute_script("return document.getElementsByClassName('yP')[%d].innerHTML;"%i))
+        return unread_email_titles
+    except Exception as error:
+        #print(error);
+        return False
 
-driver = webdriver.Chrome(driver_path, chrome_options=browser_opts)
 
-print("All Setup!")
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-E", "--email", help="Your GMail [example@gmail.com]", required=True)
+    parser.add_argument("-P", "--password", help="Your GMail Password", required=True)
+    parser.add_argument("-R", "--read-all-emails", help="Read All Email", action="store_true", required=False)
+    parser.add_argument("-I", "--incognito", action="store_true", help="Incognito Browser (Recommended)", required=False)
 
-def log(msg): print("\033[01;37m[\033[01;90m%s\033[01;37m] %s"%(time.ctime(),str(msg)))
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--windows", help="Windows Operating System", action="store_true")
+    group.add_argument("--linux", help="Linux Operating System", action="store_true")
+    group.add_argument("--mac", help="Mac Operating System", action="store_true")    
+    
+    args = vars(parser.parse_args())
 
-clients = []
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    if not args["read_all_emails"]: read_emails = False
+    else: read_emails = True
+    if os.path.exists("/Applications/Chromium.app/Contents/MacOS/Chromium"):
+        bin_path = "/Applications/Chromium.app/Contents/MacOS/Chromium"
+    elif os.path.exists("/usr/bin/chromium"):
+        bin_path = "/usr/bin/chromium"
+    else:
+        while True:
+            bin_path = raw_input("Please Enter Chrome/Chromium Executable Path: ")
+            if os.path.exists(bin_path):
+                break
+            else:
+                print("\nNot A Valid Path\n")
+                continue
 
-def receive_urls(conn):
-    while True:
-        rurl = conn.recv(65535); url = str(rurl)
-        if len(url) < 12:
-            conn.send("Valid URL Needed Please!\n")
-            log("Valid URL Needed Please!");
-            continue
-        elif url[:4] != "http" or "://" not in url[:9]:
-            conn.send("Not Valid http/https URL!\n")
-            log("Not Valid http/https URL!")
-        log("RECEIVED URL: %s"%url[:len(url)-1])
-        driver.get(url)
-def listen_for_connections():
-    while True:
-        try:
-            conn,addr = s.accept()
-            log("New Connection From %s"%str(addr[0]))
-            clients.append(conn)
-            thread.start_new_thread(receive_urls, (conn,))
-        except socket.error as error:
-            print(error)
-        except KeyboardInterrupt:
-            os.system("pkill -9 Python && pkill -9 python && pkill -9 Chromium")
-            sys.exit(0)
+    driver_path = ""
+    def driverSetup(arch):
+#	print(os.getcwd()+"/Drivers/chromedriver%s"%arch)
+        if os.path.exists(os.getcwd()+"/Drivers/chromedriver%s"%arch):
+	    #print("Driver Found")
+            driver_path = str(os.getcwd()+"/Drivers/chromedriver%s"%arch)
+	    return True
+    	else: return False    
+    def manualdriverSetup():
+        while True:
+            driver_path = raw_input("Driver Path: ")
+            if os.path.exists(driver_path):
+                driver_path = driver_path
+                break
+            else:
+                print("\nNot Valid Path\n")
+                continue
 
-if __name__ == '__main__':
-    s.bind((socket.gethostbyname(socket.gethostname()), 2907))
-    s.listen(10)
-    tlisten = threading.Thread(target=listen_for_connections); tlisten.start()
-    #ulisten = threading.Thread(target=receive_urls); ulisten.start()
+    if args["windows"]:
+	if not driverSetup(".exe"): manualdriverSetup()
+    elif args["linux"]:
+	if not driverSetup("_linux64"): manualdriverSetup()
+    elif args["mac"]:
+	if not driverSetup("_mac64"): manualdriverSetup()
+
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--mute-audio")
+    chrome_options.add_argument("--no-sandbox")
+    if args["incognito"]: chrome_options.add_argument("--incognito")
+
+    chrome_options.binary_location = bin_path
+
+    driver = webdriver.Chrome("Drivers/chromedriver_mac64", chrome_options=chrome_options)
+    loading = True
+    def loading():
+        animates = "/-\|"
+	while loading:
+	    for ani in animates:
+	        sys.stdout.write("\rChecking Credentials... %s"%ani)
+		sys.stdout.flush()
+		time.sleep(0.15)
+    t = threading.Thread(target=loading).start()
+    login = gotoLogin(driver)
+#    driver.save_screenshot("login.png")
+    if "Wrong password" in driver.page_source:
+        time.sleep(0.5)
+	print("\n\033[01;31mInvalid Email Or Password\033[0m")
+        loading=False; sys.exit(1)
+    elif "Please enter a valid" in driver.page_source:
+        time.sleep(0.5)
+	print("\n\033[01;31mInvalid Email Or Password\033[0m")
+        loading=False; sys.exit(1)
+    else:
+	time.sleep(0.5)
+        print("\n\033[01;32mLogin Successful!\033[0m")
+        time.sleep(0.5); loading=False;
+    time.sleep(0.5)
+    os.system("cls||clear")
+    dup_unread_email_titles = getUnreadEmails(driver)
+    unread_email_senders = dup_unread_email_titles[::2]
+    print("\033[01;31m-----\033[0m UNREAD EMAILS FROM \033[01;31m-----\033[0m\n")
+    for e in unread_email_senders:
+        print("\033[01;31mo\033[0m  {:20s}".format(e))
+    print("\n")
+    if read_emails == True:
+        email_titles = []
+        print("\033[01;32m-----\033[0m ALL EMAILS IN LIST \033[01;32m-----\033[0m\n")
+        for i in range(50):
+            try:
+                sys.stdout.write("{:20s}".format(driver.find_element_by_xpath("/html/body/div[7]/div[3]/div/div[2]/div[1]/div[2]/div/div/div/div/div[2]/div/div[1]/div/div/div[6]/div/div[1]/div[2]/div/table/tbody/tr[%d]/td[5]/div[2]/span/span"%i).text) + ' - ')
+                print('\033[90m'+driver.find_element_by_xpath("/html/body/div[7]/div[3]/div/div[2]/div[1]/div[2]/div/div/div/div/div[2]/div/div[1]/div/div/div[6]/div/div[1]/div[2]/div/table/tbody/tr[%d]/td[6]/div/div/div/span/span"%i).text+'\033[0m')
+            except: pass
+    cursoron()
