@@ -1,0 +1,99 @@
+#!/usr/bin/python
+
+import time, os, sys, re
+import argparse, threading
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+import GmailTools
+import GmailSetup
+
+loading = False
+
+def clear(): os.system("cls||clear")
+
+def loading_ani():
+    clear()
+    animates = "/-\|"
+    while loading:
+        for ani in animates:
+            sys.stdout.write("\r[%s] Checking Credentials..."%ani)
+            sys.stdout.flush()
+            time.sleep(0.1)
+        time.sleep(0.25)
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-E", "--email", help="Your GMail [example@gmail.com]", required=True)
+parser.add_argument("-P", "--password", help="Your GMail Password", required=True)
+parser.add_argument("-I", "--incognito", action="store_true", help="Incognito Browser (Recommended)", required=False)
+group = parser.add_mutually_exclusive_group(required=True)
+group.add_argument("--windows", help="Windows Operating System", action="store_true")
+group.add_argument("--linux", help="Linux Operating System", action="store_true")
+group.add_argument("--mac", help="Mac Operating System", action="store_true")
+group.add_argument("--manual", help="Type In Your Driver Path Manually", action="store_true")
+args = vars(parser.parse_args())
+
+
+if args["windows"]:
+    trydriver = GmailSetup.driverSetup(".exe")
+    if not trydriver: GmailSetup.manualdriverSetup()
+    else: driver_path = trydriver
+elif args["linux"]:
+    trydriver = GmailSetup.driverSetup("_linux64")
+    if not trydriver: GmailSetup.manualdriverSetup()
+    else: driver_path = trydriver
+elif args["mac"]:
+    trydriver = GmailSetup.driverSetup("_mac64")
+    if not trydriver: GmailSetup.manualdriverSetup()
+    else: driver_path = trydriver
+elif args["manual"]:
+    GmailSetup.manualdriverSetup()
+
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--mute-audio")
+chrome_options.add_argument("--no-sandbox")
+if args["incognito"]: chrome_options.add_argument("--incognito")
+
+bin_path = GmailSetup.binSetup()
+chrome_options.binary_location = bin_path
+
+driver = webdriver.Chrome(driver_path, chrome_options=chrome_options)
+
+loading = True
+t = threading.Thread(target=loading_ani).start()
+
+GmailSetup.gotoLogin(driver, args["email"], args["password"])
+if "Wrong password" in driver.page_source:
+    time.sleep(0.5)
+    print("\n\033[01;31mInvalid Email or Password\033[0m")
+    loading=False
+    sys.exit(1)
+elif "Please enter a valid" in driver.page_source:
+    time.sleep(0.5)
+    print("\n\033[01;31mInvalid Email or Password\033[0m")
+    loading=False
+    sys.exit(1)
+else:
+    loading=False
+    time.sleep(1)
+    print("\n\033[01;32mLogin Successful!\033[0m")
+    time.sleep(0.5)
+
+    clear()
+
+gmail = GmailTools.GmailParser(driver.page_source, driver)
+emails_list = []
+raw_emails = gmail.getEmails()
+
+rows, cols = os.popen("stty size", 'r').read().split()
+
+for raw_email in raw_emails:
+    if gmail.readEmail(raw_email) == False:
+        color = "\033[01;31m"
+    else:
+        color = "\033[01;32m"
+    print("%so \033[01;37m"%(color) + "{:20s}  \033[0m\033[90m/  \033[01;37m(\033[0m\033[90m{:25s}\033[0m\033[01;37m)\033[0m  \033[90m-  \033[0m".format(gmail.getEmailName(raw_email)[:int(cols)/5], gmail.getEmailSender(raw_email)[:(int(cols)/4)]) + "\033[02;34m%s\033[0m"%(gmail.getEmailSubject(raw_email)[:(int(cols)/2)-15]))
